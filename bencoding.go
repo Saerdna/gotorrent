@@ -44,6 +44,17 @@ func Marshal(v interface{}) (string, error) {
 		}
 		d += "e"
 		return d, nil
+	case reflect.Array, reflect.Slice:
+		l := "l"
+		for i := 0; i < value.Len(); i++ {
+			s, err := Marshal(value.Index(i).Interface())
+			if err != nil {
+				return "", err
+			}
+			l += s
+		}
+		l += "e"
+		return l, nil
 	default:
 		return "", fmt.Errorf("Can't marshal type %v, value %v", value.Kind(), v)
 	}
