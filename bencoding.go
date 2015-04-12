@@ -119,7 +119,30 @@ func Unmarshal(s string, v interface{}) error {
 			}
 		}
 		if s != "" {
-			return fmt.Errorf("Unconsumed inputs in %v when unmarshaling to %v", s, v)
+			return fmt.Errorf("Unconsumed inputs in %v when unmarshaling to %v, %v", s, value, v)
+		}
+		return nil
+	case reflect.Struct:
+		if s[0] != 'l' || s[len(s)-1] != 'e' {
+			return fmt.Errorf("Expected list for %v, found %v", v, s)
+		}
+		s = s[1 : len(s)-1]
+		for i := 0; i < value.NumField(); i++ {
+			if !value.Field(i).CanSet() {
+				continue
+			}
+			token, leftovers, err := GetOneToken(s)
+			if err != nil {
+				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
+			}
+			s = leftovers
+			err = Unmarshal(token, value.Field(i).Addr().Interface())
+			if err != nil {
+				return err
+			}
+		}
+		if s != "" {
+			return fmt.Errorf("Unconsumed inputs in %v when unmarshaling to %v, %v", s, value, v)
 		}
 		return nil
 	default:

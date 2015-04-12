@@ -122,10 +122,69 @@ func TestUnmarshalArrayOfArrays(t *testing.T) {
 		return
 	}
 	for i := 0; i < len(expected); i++ {
+		if len(expected[i]) != len(actual[i]) {
+			t.Errorf("Different lengths.  Expected: %v Actual: %v Input: %v", expected, actual, input)
+			return
+		}
 		for j := 0; j < len(expected[i]); j++ {
 			if expected[i][j] != actual[i][j] {
 				t.Errorf("Expected %v, got %v on input %v", expected[i][j], actual[i][j], input)
 			}
+		}
+	}
+}
+
+func TestUnmarshalStruct(t *testing.T) {
+	actual := TestList{}
+	input := "l5:alicei30ee"
+	expected := TestList{"alice", 30}
+	err := Unmarshal(input, &actual)
+	ValidateUnmarshal(input, expected, actual, err, t)
+}
+
+type TestListWithPrivate struct {
+	Name  string
+	dummy string
+	Age   int
+}
+
+func TestUnmarshalStructSkipsPrivate(t *testing.T) {
+	actual := TestListWithPrivate{}
+	input := "l5:alicei30ee"
+	expected := TestListWithPrivate{Name: "alice", Age: 30}
+	err := Unmarshal(input, &actual)
+	ValidateUnmarshal(input, expected, actual, err, t)
+}
+
+type TestListWithArray struct {
+	Name string
+	Kids []string
+	Age  int
+}
+
+func TestUnmarshalStructWithArray(t *testing.T) {
+	actual := TestListWithArray{}
+	actual.Kids = make([]string, 2)
+	input := "l5:alicel3:bob5:carolei30ee"
+	expected := TestListWithArray{"alice", []string{"bob", "carol"}, 30}
+	err := Unmarshal(input, &actual)
+	if err != nil {
+		t.Errorf("Error unmarshalling %v (expected %v, received %v): %v",
+			input, expected, actual, err)
+		return
+	}
+	if expected.Name != actual.Name || expected.Age != actual.Age {
+		t.Errorf("Expected %v, got %v on input %v", expected, actual, input)
+		return
+	}
+	if len(actual.Kids) != len(expected.Kids) {
+		t.Errorf("Different lengths.  Expected: %v Actual: %v Input: %v", expected, actual, input)
+		return
+	}
+	for i := 0; i < len(actual.Kids); i++ {
+		if expected.Kids[i] != actual.Kids[i] {
+			t.Errorf("Expected %v, got %v on input %v", expected.Kids[i], actual.Kids[i], input)
+			return
 		}
 	}
 }
