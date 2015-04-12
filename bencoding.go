@@ -171,18 +171,21 @@ func Unmarshal(s string, v interface{}) error {
 			}
 			fieldName := camelCase(unmarshalledFieldName)
 			field := value.FieldByName(fieldName)
-			if !field.IsValid() {
-				return fmt.Errorf("Struct %v contains no field named %v", value, fieldName)
-			}
-			if !field.CanSet() {
-				return fmt.Errorf("Dict contained value for unsettable field %v", token)
-			}
 
 			token, leftovers, err = getOneToken(s)
 			if err != nil {
 				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
 			}
 			s = leftovers
+
+			if !field.IsValid() {
+				fmt.Printf("Skipping unknown field %v, value %v\n", fieldName, token)
+				continue
+			}
+			if !field.CanSet() {
+				return fmt.Errorf("Dict contained value for unsettable field %v", token)
+			}
+
 			err = Unmarshal(token, field.Addr().Interface())
 			if err != nil {
 				return err
