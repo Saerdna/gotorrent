@@ -9,17 +9,15 @@ type MetaInfo struct {
 	CreatedBy     string
 	CreationDate  int
 	Encoding      string
+	InfoHash      string
 	Info          struct {
 		Name        string
 		PieceLength int
 		Pieces      string
-		Private     int
 		Length      int
-		Md5sum      string
 		Files       []struct {
 			Length int
 			Path   []string
-			Md5sum string
 		}
 	}
 }
