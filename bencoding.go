@@ -8,68 +8,72 @@ import (
 	"strings"
 )
 
-func Marshal(v interface{}) (string, error) {
-	value := reflect.ValueOf(v)
+// Marshal takes the given Go datastructure and converts it to a bencoded string.
+func Marshal(source interface{}) (bencoded_string string, err error) {
+	value := reflect.ValueOf(source)
 	switch value.Kind() {
 	case reflect.Int:
-		i := v.(int)
+		i := source.(int)
 		return "i" + strconv.Itoa(i) + "e", nil
 	case reflect.String:
-		s := v.(string)
+		s := source.(string)
 		return strconv.Itoa(len(s)) + ":" + s, nil
 	case reflect.Array, reflect.Slice:
-		l := "l"
+		list_string := "l"
 		for i := 0; i < value.Len(); i++ {
-			s, err := Marshal(value.Index(i).Interface())
+			token, err := Marshal(value.Index(i).Interface())
 			if err != nil {
 				return "", err
 			}
-			l += s
+			list_string += token
 		}
-		l += "e"
-		return l, nil
+		list_string += "e"
+		return list_string, nil
 	case reflect.Struct:
-		l := "l"
+		list_string := "l"
 		for i := 0; i < value.NumField(); i++ {
 			field := value.Field(i)
 			if field.CanInterface() {
-				s, err := Marshal(field.Interface())
+				token, err := Marshal(field.Interface())
 				if err != nil {
 					return "", err
 				}
-				l += s
+				list_string += token
 			}
 		}
-		l += "e"
-		return l, nil
+		list_string += "e"
+		return list_string, nil
 	case reflect.Map:
-		m := map[string]string{}
-		keys := []string{}
-		for _, key := range value.MapKeys() {
-			ks, err := Marshal(key.Interface())
+		marshalled_map := map[string]string{}
+		marshalled_keys := []string{}
+		for _, key_value := range value.MapKeys() {
+			marshalled_key, err := Marshal(key_value.Interface())
 			if err != nil {
 				return "", err
 			}
-			keys = append(keys, ks)
-			vs, err := Marshal(value.MapIndex(key).Interface())
+			marshalled_keys = append(marshalled_keys, marshalled_key)
+			marshalled_value, err := Marshal(value.MapIndex(key_value).Interface())
 			if err != nil {
 				return "", err
 			}
-			m[ks] = vs
+			marshalled_map[marshalled_key] = marshalled_value
 		}
-		sort.Strings(keys)
-		d := "d"
-		for _, ks := range keys {
-			d += ks + m[ks]
+		sort.Strings(marshalled_keys)
+		dict_string := "d"
+		for _, marshalled_key := range marshalled_keys {
+			dict_string += marshalled_key + marshalled_map[marshalled_key]
 		}
-		d += "e"
-		return d, nil
+		dict_string += "e"
+		return dict_string, nil
 	default:
-		return "", fmt.Errorf("Can't marshal type %v, value %v", value.Kind(), v)
+		return "", fmt.Errorf("Can't marshal type %v, value %v", value.Kind(), source)
 	}
 }
 
-// TODO(apm): Lots of string copies in here, would be an easy performance boost.
+// Unmarshal takes a bencoded string and a target object, and fills out the target object
+// with the values from the bencoded string.  The structure of the target object must match
+// the structure of the string.  Slices will be automatically sized.
+// TODO(apm): Lots of string copies in here, look into optimizations.
 func Unmarshal(s string, v interface{}) error {
 	ptr_value := reflect.ValueOf(v)
 	switch ptr_value.Kind() {
@@ -116,7 +120,7 @@ func Unmarshal(s string, v interface{}) error {
 		s = s[1 : len(s)-1]
 		tokens := []string{}
 		for len(s) > 0 {
-			token, leftovers, err := GetOneToken(s)
+			token, leftovers, err := getOneToken(s)
 			if err != nil {
 				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
 			}
@@ -150,7 +154,7 @@ func Unmarshal(s string, v interface{}) error {
 			if !value.Field(i).CanSet() {
 				continue
 			}
-			token, leftovers, err := GetOneToken(s)
+			token, leftovers, err := getOneToken(s)
 			if err != nil {
 				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
 			}
@@ -170,7 +174,7 @@ func Unmarshal(s string, v interface{}) error {
 		}
 		s = s[1 : len(s)-1]
 		for len(s) > 0 {
-			key, leftovers, err := GetOneToken(s)
+			key, leftovers, err := getOneToken(s)
 			if err != nil {
 				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
 			}
@@ -181,7 +185,7 @@ func Unmarshal(s string, v interface{}) error {
 				return err
 			}
 
-			elem, leftovers, err := GetOneToken(s)
+			elem, leftovers, err := getOneToken(s)
 			if err != nil {
 				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
 			}
@@ -200,7 +204,8 @@ func Unmarshal(s string, v interface{}) error {
 	}
 }
 
-func GetOneToken(s string) (token, leftovers string, err error) {
+// TODO(apm): This would be a lot cleaner if we built a syntax tree.
+func getOneToken(s string) (token, leftovers string, err error) {
 	switch s[0] {
 	case 'i':
 		substrings := strings.SplitAfterN(s, "e", 2)
@@ -217,7 +222,7 @@ func GetOneToken(s string) (token, leftovers string, err error) {
 				leftovers = leftovers[1:]
 				return token, leftovers, nil
 			}
-			subtoken, new_leftovers, err := GetOneToken(leftovers)
+			subtoken, new_leftovers, err := getOneToken(leftovers)
 			if err != nil {
 				return "", "", fmt.Errorf("Subtoken error: %v", err)
 			}

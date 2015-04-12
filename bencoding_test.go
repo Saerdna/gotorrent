@@ -30,7 +30,7 @@ func TestMarshal(t *testing.T) {
 		ValidateMarshal(input, expected, t)
 	}
 	ValidateMarshal(
-		map[TestList]int{TestList{"bob", 25}: 30, TestList{"alice", 30}: 35},
+		map[TestList]int{TestList{"alice", 30}: 35, TestList{"bob", 25}: 30},
 		"dl3:bobi25eei30el5:alicei30eei35ee", t)
 	ValidateMarshal([]int{10, 20, 30}, "li10ei20ei30ee", t)
 }
