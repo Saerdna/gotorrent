@@ -64,7 +64,7 @@ func TestUnmarshalString(t *testing.T) {
 }
 
 func TestUnmarshalStringArray(t *testing.T) {
-	actual := make([]string, 3)
+	var actual []string
 	input := "l4:spam4:eggs5:bacone"
 	expected := []string{"spam", "eggs", "bacon"}
 	err := Unmarshal(input, &actual)
@@ -85,7 +85,7 @@ func TestUnmarshalStringArray(t *testing.T) {
 }
 
 func TestUnmarshalIntegerArray(t *testing.T) {
-	actual := make([]int, 3)
+	var actual []int
 	input := "li10ei20ei30ee"
 	expected := []int{10, 20, 30}
 	err := Unmarshal(input, &actual)
@@ -106,9 +106,7 @@ func TestUnmarshalIntegerArray(t *testing.T) {
 }
 
 func TestUnmarshalArrayOfArrays(t *testing.T) {
-	actual := make([][]int, 2)
-	actual[0] = make([]int, 3)
-	actual[1] = make([]int, 2)
+	var actual [][]int
 	input := "l" + "li10ei20ei30ee" + "li10ei20ee" + "e"
 	expected := [][]int{{10, 20, 30}, {10, 20}}
 	err := Unmarshal(input, &actual)
@@ -162,9 +160,8 @@ type TestListWithArray struct {
 	Age  int
 }
 
-func TestUnmarshalStructWithArray(t *testing.T) {
+func TestUnmarshalStructWithSlice(t *testing.T) {
 	actual := TestListWithArray{}
-	actual.Kids = make([]string, 2)
 	input := "l5:alicel3:bob5:carolei30ee"
 	expected := TestListWithArray{"alice", []string{"bob", "carol"}, 30}
 	err := Unmarshal(input, &actual)

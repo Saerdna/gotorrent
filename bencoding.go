@@ -3,6 +3,7 @@ package gotorrent
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -42,18 +43,24 @@ func Marshal(v interface{}) (string, error) {
 		l += "e"
 		return l, nil
 	case reflect.Map:
-		d := "d"
-		// TODO(apm): The iteration order is nondeterministic.  Ugh.
+		m := map[string]string{}
+		keys := []string{}
 		for _, key := range value.MapKeys() {
 			ks, err := Marshal(key.Interface())
 			if err != nil {
 				return "", err
 			}
+			keys = append(keys, ks)
 			vs, err := Marshal(value.MapIndex(key).Interface())
 			if err != nil {
 				return "", err
 			}
-			d += ks + vs
+			m[ks] = vs
+		}
+		sort.Strings(keys)
+		d := "d"
+		for _, ks := range keys {
+			d += ks + m[ks]
 		}
 		d += "e"
 		return d, nil
@@ -102,20 +109,30 @@ func Unmarshal(s string, v interface{}) error {
 		}
 		value.SetString(substrings[1])
 		return nil
-	// TODO(apm): Would be nice to allocate the array instead of requiring it to be the
-	// right size.
 	case reflect.Array, reflect.Slice:
 		if s[0] != 'l' || s[len(s)-1] != 'e' {
 			return fmt.Errorf("Expected list for %v, found %v", v, s)
 		}
 		s = s[1 : len(s)-1]
-		for i := 0; i < value.Len(); i++ {
+		tokens := []string{}
+		for len(s) > 0 {
 			token, leftovers, err := GetOneToken(s)
 			if err != nil {
 				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
 			}
 			s = leftovers
-			err = Unmarshal(token, value.Index(i).Addr().Interface())
+			tokens = append(tokens, token)
+		}
+
+		if value.Len() != len(tokens) {
+			if value.Kind() == reflect.Array {
+				return fmt.Errorf("Length mismatch on array %v: tokens %v", value, tokens)
+			}
+			value.Set(reflect.MakeSlice(value.Type(), len(tokens), len(tokens)))
+		}
+
+		for i := 0; i < value.Len(); i++ {
+			err := Unmarshal(tokens[i], value.Index(i).Addr().Interface())
 			if err != nil {
 				return err
 			}
