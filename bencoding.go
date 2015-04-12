@@ -102,6 +102,8 @@ func Unmarshal(s string, v interface{}) error {
 		}
 		value.SetString(substrings[1])
 		return nil
+	// TODO(apm): Would be nice to allocate the array instead of requiring it to be the
+	// right size.
 	case reflect.Array, reflect.Slice:
 		if s[0] != 'l' || s[len(s)-1] != 'e' {
 			return fmt.Errorf("Expected list for %v, found %v", v, s)
@@ -143,6 +145,37 @@ func Unmarshal(s string, v interface{}) error {
 		}
 		if s != "" {
 			return fmt.Errorf("Unconsumed inputs in %v when unmarshaling to %v, %v", s, value, v)
+		}
+		return nil
+	case reflect.Map:
+		if s[0] != 'd' || s[len(s)-1] != 'e' {
+			return fmt.Errorf("Expected map for %v, found %v", v, s)
+		}
+		s = s[1 : len(s)-1]
+		for len(s) > 0 {
+			key, leftovers, err := GetOneToken(s)
+			if err != nil {
+				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
+			}
+			s = leftovers
+			key_val := reflect.New(value.Type().Key())
+			err = Unmarshal(key, key_val.Interface())
+			if err != nil {
+				return err
+			}
+
+			elem, leftovers, err := GetOneToken(s)
+			if err != nil {
+				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
+			}
+			s = leftovers
+			elem_val := reflect.New(value.Type().Elem())
+			err = Unmarshal(elem, elem_val.Interface())
+			if err != nil {
+				return err
+			}
+
+			value.SetMapIndex(key_val.Elem(), elem_val.Elem())
 		}
 		return nil
 	default:

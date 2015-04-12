@@ -178,13 +178,41 @@ func TestUnmarshalStructWithArray(t *testing.T) {
 		return
 	}
 	if len(actual.Kids) != len(expected.Kids) {
-		t.Errorf("Different lengths.  Expected: %v Actual: %v Input: %v", expected, actual, input)
+		t.Errorf("Different lengths.  Expected: %v Actual: %v Input: %v",
+			expected.Kids, actual.Kids, input)
 		return
 	}
 	for i := 0; i < len(actual.Kids); i++ {
 		if expected.Kids[i] != actual.Kids[i] {
 			t.Errorf("Expected %v, got %v on input %v", expected.Kids[i], actual.Kids[i], input)
 			return
+		}
+	}
+}
+
+func TestUnmarshalMap(t *testing.T) {
+	actual := map[string]int{}
+	input := "d5:alicei30e3:bobi25ee"
+	expected := map[string]int{
+		"alice": 30,
+		"bob":   25,
+	}
+	err := Unmarshal(input, &actual)
+	if err != nil {
+		t.Errorf("Error unmarshalling %v (expected %v, received %v): %v",
+			input, expected, actual, err)
+		return
+	}
+	if len(expected) != len(actual) {
+		t.Errorf("Different lengths.  Expected: %v Actual: %v Input: %v", expected, actual, input)
+	}
+	for k, v := range expected {
+		val, present := actual[k]
+		if !present {
+			t.Errorf("Key not found in actual: %v", k)
+		}
+		if val != v {
+			t.Errorf("Different values for key %v.  Expected: %v Actual: %v", k, v, val)
 		}
 	}
 }
