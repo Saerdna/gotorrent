@@ -1,6 +1,7 @@
 package bencoding
 
 import (
+	"crypto/sha1"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -101,20 +102,29 @@ func Unmarshal(s string, v interface{}) error {
 				return fmt.Errorf("Unable to unmarshall field name %v: %v", token, err)
 			}
 			fieldName := camelCase(unmarshalledFieldName)
-			field := value.FieldByName(fieldName)
 
+			// Consume the next token even if the field is not present/valid.  We do this
+			// to remove it from the stream, even though we won't use the value.
 			token, leftovers, err = getOneToken(s)
 			if err != nil {
 				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
 			}
 			s = leftovers
 
+			field := value.FieldByName(fieldName)
 			if !field.IsValid() {
 				// TODO(apm): Figure out something better to do with unknown fields.
 				continue
 			}
 			if !field.CanSet() {
 				return fmt.Errorf("Dict contained value for unsettable field %v", token)
+			}
+
+			hashField := value.FieldByName(fieldName + "Hash")
+			if hashField.IsValid() {
+				hash := sha1.Sum([]byte(token))
+				hashString := string(hash[:])
+				hashField.SetString(hashString)
 			}
 
 			err = Unmarshal(token, field.Addr().Interface())
