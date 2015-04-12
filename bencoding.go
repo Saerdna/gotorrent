@@ -113,7 +113,10 @@ func Unmarshal(s string, v interface{}) error {
 				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
 			}
 			s = leftovers
-			Unmarshal(token, value.Index(i).Addr().Interface())
+			err = Unmarshal(token, value.Index(i).Addr().Interface())
+			if err != nil {
+				return err
+			}
 		}
 		if s != "" {
 			return fmt.Errorf("Unconsumed inputs in %v when unmarshaling to %v", s, v)
@@ -129,23 +132,26 @@ func GetOneToken(s string) (token, leftovers string, err error) {
 	case 'i':
 		substrings := strings.SplitAfterN(s, "e", 2)
 		if len(substrings) < 2 {
-			return "", "", fmt.Errorf("No termination for leading integer in %s", s)
+			return "", "", fmt.Errorf("No termination for leading integer in %v", s)
 		}
 		return substrings[0], substrings[1], nil
 	case 'l', 'd':
-		count := 1
-		for i, c := range s[1:] {
-			switch c {
-			case 'e':
-				count--
-			case 'l', 'd', 'i':
-				count++
+		token := s[0:1]
+		leftovers := s[1:]
+		for len(leftovers) > 0 {
+			if leftovers[0] == 'e' {
+				token += leftovers[0:1]
+				leftovers = leftovers[1:]
+				return token, leftovers, nil
 			}
-			if count == 0 {
-				return s[:i+1], s[i+1:], nil
+			subtoken, new_leftovers, err := GetOneToken(leftovers)
+			if err != nil {
+				return "", "", fmt.Errorf("Subtoken error: %v", err)
 			}
+			token += subtoken
+			leftovers = new_leftovers
 		}
-		return "", "", fmt.Errorf("No termination for token in %s", s)
+		return "", "", fmt.Errorf("No termination for token in %v", s)
 	default:
 		colonIndex := strings.Index(s, ":")
 		if colonIndex < 0 {
