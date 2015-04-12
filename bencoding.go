@@ -172,7 +172,7 @@ func Unmarshal(s string, v interface{}) error {
 			fieldName := camelCase(unmarshalledFieldName)
 			field := value.FieldByName(fieldName)
 			if !field.IsValid() {
-				return fmt.Errorf("Struct contains no field named %v", fieldName)
+				return fmt.Errorf("Struct %v contains no field named %v", value, fieldName)
 			}
 			if !field.CanSet() {
 				return fmt.Errorf("Dict contained value for unsettable field %v", token)
@@ -235,6 +235,8 @@ func lowerCaseWithSpaces(s string) (lower string) {
 			lower += string(r)
 		} else if unicode.IsUpper(r) {
 			lower += " " + string(unicode.ToLower(r))
+		} else if string(r) == "_" {
+			lower += "-"
 		}
 	}
 	return strings.TrimSpace(lower)
@@ -248,6 +250,8 @@ func camelCase(s string) (camel string) {
 			previousRuneWasSpace = false
 		} else if unicode.IsSpace(r) {
 			previousRuneWasSpace = true
+		} else if string(r) == "-" {
+			camel += "_"
 		} else {
 			camel += string(r)
 		}
