@@ -62,3 +62,45 @@ func TestUnmarshalString(t *testing.T) {
 	err := Unmarshal(input, &actual)
 	ValidateUnmarshal(input, expected, actual, err, t)
 }
+
+func TestUnmarshalStringArray(t *testing.T) {
+	actual := make([]string, 3)
+	input := "l4:spam4:eggs5:bacone"
+	expected := []string{"spam", "eggs", "bacon"}
+	err := Unmarshal(input, &actual)
+	if err != nil {
+		t.Errorf("Error marshalling %v (expected %v, received %v): %v",
+			input, expected, actual, err)
+		return
+	}
+	if len(expected) != len(actual) {
+		t.Errorf("Different lengths.  Expected: %v Actual: %v Input: %v", expected, actual, input)
+		return
+	}
+	for i := 0; i < len(expected); i++ {
+		if expected[i] != actual[i] {
+			t.Errorf("Expected %v, got %v on input %v", expected[i], actual[i], input)
+		}
+	}
+}
+
+func TestUnmarshalIntegerArray(t *testing.T) {
+	actual := make([]int, 3)
+	input := "li10ei20ei30ee"
+	expected := []int{10, 20, 30}
+	err := Unmarshal(input, &actual)
+	if err != nil {
+		t.Errorf("Error marshalling %v (expected %v, received %v): %v",
+			input, expected, actual, err)
+		return
+	}
+	if len(expected) != len(actual) {
+		t.Errorf("Different lengths.  Expected: %v Actual: %v Input: %v", expected, actual, input)
+		return
+	}
+	for i := 0; i < len(expected); i++ {
+		if expected[i] != actual[i] {
+			t.Errorf("Expected %v, got %v on input %v", expected[i], actual[i], input)
+		}
+	}
+}

@@ -16,6 +16,17 @@ func Marshal(v interface{}) (string, error) {
 	case reflect.String:
 		s := v.(string)
 		return strconv.Itoa(len(s)) + ":" + s, nil
+	case reflect.Array, reflect.Slice:
+		l := "l"
+		for i := 0; i < value.Len(); i++ {
+			s, err := Marshal(value.Index(i).Interface())
+			if err != nil {
+				return "", err
+			}
+			l += s
+		}
+		l += "e"
+		return l, nil
 	case reflect.Struct:
 		l := "l"
 		for i := 0; i < value.NumField(); i++ {
@@ -27,17 +38,6 @@ func Marshal(v interface{}) (string, error) {
 				}
 				l += s
 			}
-		}
-		l += "e"
-		return l, nil
-	case reflect.Array, reflect.Slice:
-		l := "l"
-		for i := 0; i < value.Len(); i++ {
-			s, err := Marshal(value.Index(i).Interface())
-			if err != nil {
-				return "", err
-			}
-			l += s
 		}
 		l += "e"
 		return l, nil
@@ -62,6 +62,7 @@ func Marshal(v interface{}) (string, error) {
 	}
 }
 
+// TODO(apm): Lots of string copies in here, would be an easy performance boost.
 func Unmarshal(s string, v interface{}) error {
 	ptr_value := reflect.ValueOf(v)
 	switch ptr_value.Kind() {
@@ -101,7 +102,60 @@ func Unmarshal(s string, v interface{}) error {
 		}
 		value.SetString(substrings[1])
 		return nil
+	case reflect.Array, reflect.Slice:
+		if s[0] != 'l' || s[len(s)-1] != 'e' {
+			return fmt.Errorf("Expected list for %v, found %v", v, s)
+		}
+		s = s[1 : len(s)-1]
+		for i := 0; i < value.Len(); i++ {
+			token, leftovers, err := GetOneToken(s)
+			if err != nil {
+				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
+			}
+			s = leftovers
+			Unmarshal(token, value.Index(i).Addr().Interface())
+		}
+		if s != "" {
+			return fmt.Errorf("Unconsumed inputs in %v when unmarshaling to %v", s, v)
+		}
+		return nil
 	default:
 		return fmt.Errorf("Can't unmarshal to type %v, value %v", value.Kind(), v)
+	}
+}
+
+func GetOneToken(s string) (token, leftovers string, err error) {
+	switch s[0] {
+	case 'i':
+		substrings := strings.SplitAfterN(s, "e", 2)
+		if len(substrings) < 2 {
+			return "", "", fmt.Errorf("No termination for leading integer in %s", s)
+		}
+		return substrings[0], substrings[1], nil
+	case 'l', 'd':
+		count := 1
+		for i, c := range s[1:] {
+			switch c {
+			case 'e':
+				count--
+			case 'l', 'd', 'i':
+				count++
+			}
+			if count == 0 {
+				return s[:i+1], s[i+1:], nil
+			}
+		}
+		return "", "", fmt.Errorf("No termination for token in %s", s)
+	default:
+		colonIndex := strings.Index(s, ":")
+		if colonIndex < 0 {
+			return "", "", fmt.Errorf("Couldn't parse token in %v", s)
+		}
+		length, err := strconv.Atoi(s[:colonIndex])
+		if err != nil {
+			return "", "", fmt.Errorf("Couldn't parse length of string %v: %v", s, err)
+		}
+		tokenLength := colonIndex + length + 1
+		return s[:tokenLength], s[tokenLength:], nil
 	}
 }
