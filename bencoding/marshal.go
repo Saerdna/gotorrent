@@ -5,8 +5,6 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
-	"strings"
-	"unicode"
 )
 
 // Marshal takes the given Go datastructure and converts it to a bencoded string.
@@ -37,7 +35,7 @@ func Marshal(source interface{}) (bencoded_string string, err error) {
 			field := value.Field(i)
 			if field.CanInterface() {
 				fieldName := value.Type().Field(i).Name
-				marshalledFieldName, err := Marshal(lowerCaseWithSpaces(fieldName))
+				marshalledFieldName, err := Marshal(ToLowerCaseWithSpaces(fieldName))
 				if err != nil {
 					return "", err
 				}
@@ -77,18 +75,4 @@ func Marshal(source interface{}) (bencoded_string string, err error) {
 	default:
 		return "", fmt.Errorf("Can't marshal type %v, value %v", value.Kind(), source)
 	}
-}
-
-// Converts a CamelCase string to a lower case string with spaces
-func lowerCaseWithSpaces(s string) (lower string) {
-	for _, r := range s {
-		if unicode.IsLower(r) {
-			lower += string(r)
-		} else if unicode.IsUpper(r) {
-			lower += " " + string(unicode.ToLower(r))
-		} else if string(r) == "_" {
-			lower += "-"
-		}
-	}
-	return strings.TrimSpace(lower)
 }

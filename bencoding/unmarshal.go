@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"unicode"
 )
 
 // Unmarshal takes a bencoded string and a target object, and fills out the target object
@@ -101,7 +100,7 @@ func Unmarshal(s string, v interface{}) error {
 			if err != nil {
 				return fmt.Errorf("Unable to unmarshall field name %v: %v", token, err)
 			}
-			fieldName := camelCase(unmarshalledFieldName)
+			fieldName := ToCamelCase(unmarshalledFieldName)
 
 			// Consume the next token even if the field is not present/valid.  We do this
 			// to remove it from the stream, even though we won't use the value.
@@ -170,24 +169,6 @@ func Unmarshal(s string, v interface{}) error {
 	default:
 		return fmt.Errorf("Can't unmarshal to type %v, value %v", value.Kind(), v)
 	}
-}
-
-func camelCase(s string) (camel string) {
-	previousRuneWasSpace := true
-	for _, r := range s {
-		if previousRuneWasSpace {
-			camel += string(unicode.ToUpper(r))
-			previousRuneWasSpace = false
-		} else if unicode.IsSpace(r) {
-			previousRuneWasSpace = true
-		} else if string(r) == "-" {
-			camel += "_"
-			previousRuneWasSpace = true
-		} else {
-			camel += string(r)
-		}
-	}
-	return camel
 }
 
 // TODO(apm): This would be a lot cleaner if we built a syntax tree.
