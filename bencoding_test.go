@@ -1,4 +1,4 @@
-package gotorrent
+package bencoding
 
 import "testing"
 
