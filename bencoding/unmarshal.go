@@ -110,7 +110,7 @@ func Unmarshal(s string, v interface{}) error {
 			s = leftovers
 
 			if !field.IsValid() {
-				fmt.Printf("Skipping unknown field %v, value %v\n", fieldName, token)
+				// TODO(apm): Figure out something better to do with unknown fields.
 				continue
 			}
 			if !field.CanSet() {

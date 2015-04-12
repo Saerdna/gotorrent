@@ -1,7 +1,6 @@
 package gotorrent
 
 import (
-	"fmt"
 	"io/ioutil"
 	"testing"
 
@@ -15,7 +14,7 @@ func TestMetaInfo(t *testing.T) {
 		"sample.torrent",
 	}
 	for _, testFile := range testFiles {
-		fmt.Printf("Testing %v\n", testFile)
+		t.Logf("Testing %v\n", testFile)
 		b, err := ioutil.ReadFile("testData/" + testFile)
 		if err != nil {
 			t.Errorf("Unable to find testdata.")
@@ -25,6 +24,6 @@ func TestMetaInfo(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unable to unmarshal %v: %v", string(b), err)
 		}
-		fmt.Printf("Loaded from %v, name %v\n", metaInfo.Announce, metaInfo.Info.Name)
+		t.Logf("Loaded from %v, name %v\n", metaInfo.Announce, metaInfo.Info.Name)
 	}
 }
