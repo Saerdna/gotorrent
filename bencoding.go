@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // Marshal takes the given Go datastructure and converts it to a bencoded string.
@@ -19,52 +20,59 @@ func Marshal(source interface{}) (bencoded_string string, err error) {
 		s := source.(string)
 		return strconv.Itoa(len(s)) + ":" + s, nil
 	case reflect.Array, reflect.Slice:
-		list_string := "l"
+		listString := "l"
 		for i := 0; i < value.Len(); i++ {
 			token, err := Marshal(value.Index(i).Interface())
 			if err != nil {
 				return "", err
 			}
-			list_string += token
+			listString += token
 		}
-		list_string += "e"
-		return list_string, nil
+		listString += "e"
+		return listString, nil
 	case reflect.Struct:
-		list_string := "l"
+		dictString := "d"
 		for i := 0; i < value.NumField(); i++ {
 			field := value.Field(i)
 			if field.CanInterface() {
-				token, err := Marshal(field.Interface())
+				fieldName := value.Type().Field(i).Name
+				marshalledFieldName, err := Marshal(lowerCaseWithSpaces(fieldName))
 				if err != nil {
 					return "", err
 				}
-				list_string += token
+				dictString += marshalledFieldName
+
+				marshalledValue, err := Marshal(field.Interface())
+				if err != nil {
+					return "", err
+				}
+				dictString += marshalledValue
 			}
 		}
-		list_string += "e"
-		return list_string, nil
+		dictString += "e"
+		return dictString, nil
 	case reflect.Map:
-		marshalled_map := map[string]string{}
-		marshalled_keys := []string{}
-		for _, key_value := range value.MapKeys() {
-			marshalled_key, err := Marshal(key_value.Interface())
+		marshalledMap := map[string]string{}
+		marshalledKeys := []string{}
+		for _, keyValue := range value.MapKeys() {
+			marshalledKey, err := Marshal(keyValue.Interface())
 			if err != nil {
 				return "", err
 			}
-			marshalled_keys = append(marshalled_keys, marshalled_key)
-			marshalled_value, err := Marshal(value.MapIndex(key_value).Interface())
+			marshalledKeys = append(marshalledKeys, marshalledKey)
+			marshalledValue, err := Marshal(value.MapIndex(keyValue).Interface())
 			if err != nil {
 				return "", err
 			}
-			marshalled_map[marshalled_key] = marshalled_value
+			marshalledMap[marshalledKey] = marshalledValue
 		}
-		sort.Strings(marshalled_keys)
-		dict_string := "d"
-		for _, marshalled_key := range marshalled_keys {
-			dict_string += marshalled_key + marshalled_map[marshalled_key]
+		sort.Strings(marshalledKeys)
+		dictString := "d"
+		for _, marshalledKey := range marshalledKeys {
+			dictString += marshalledKey + marshalledMap[marshalledKey]
 		}
-		dict_string += "e"
-		return dict_string, nil
+		dictString += "e"
+		return dictString, nil
 	default:
 		return "", fmt.Errorf("Can't marshal type %v, value %v", value.Kind(), source)
 	}
@@ -75,15 +83,15 @@ func Marshal(source interface{}) (bencoded_string string, err error) {
 // the structure of the string.  Slices will be automatically sized.
 // TODO(apm): Lots of string copies in here, look into optimizations.
 func Unmarshal(s string, v interface{}) error {
-	ptr_value := reflect.ValueOf(v)
-	switch ptr_value.Kind() {
+	ptrValue := reflect.ValueOf(v)
+	switch ptrValue.Kind() {
 	case reflect.Interface, reflect.Ptr:
 		break
 	default:
-		return fmt.Errorf("Must pass a pointer or struct to Unmarshal, received %v", ptr_value)
+		return fmt.Errorf("Must pass a pointer or struct to Unmarshal, received %v", ptrValue)
 	}
 
-	value := ptr_value.Elem()
+	value := ptrValue.Elem()
 	if !value.CanSet() {
 		return fmt.Errorf("Received unsettable value %v", v)
 	}
@@ -146,20 +154,36 @@ func Unmarshal(s string, v interface{}) error {
 		}
 		return nil
 	case reflect.Struct:
-		if s[0] != 'l' || s[len(s)-1] != 'e' {
-			return fmt.Errorf("Expected list for %v, found %v", v, s)
+		if s[0] != 'd' || s[len(s)-1] != 'e' {
+			return fmt.Errorf("Expected dict for %v, found %v", v, s)
 		}
 		s = s[1 : len(s)-1]
-		for i := 0; i < value.NumField(); i++ {
-			if !value.Field(i).CanSet() {
-				continue
-			}
+		for len(s) > 0 {
 			token, leftovers, err := getOneToken(s)
 			if err != nil {
 				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
 			}
 			s = leftovers
-			err = Unmarshal(token, value.Field(i).Addr().Interface())
+			var unmarshalledFieldName string
+			err = Unmarshal(token, &unmarshalledFieldName)
+			if err != nil {
+				return fmt.Errorf("Unable to unmarshall field name %v: %v", token, err)
+			}
+			fieldName := camelCase(unmarshalledFieldName)
+			field := value.FieldByName(fieldName)
+			if !field.IsValid() {
+				return fmt.Errorf("Struct contains no field named %v", fieldName)
+			}
+			if !field.CanSet() {
+				return fmt.Errorf("Dict contained value for unsettable field %v", token)
+			}
+
+			token, leftovers, err = getOneToken(s)
+			if err != nil {
+				return fmt.Errorf("Unable to tokenize string %v: err %v", s, err)
+			}
+			s = leftovers
+			err = Unmarshal(token, field.Addr().Interface())
 			if err != nil {
 				return err
 			}
@@ -202,6 +226,33 @@ func Unmarshal(s string, v interface{}) error {
 	default:
 		return fmt.Errorf("Can't unmarshal to type %v, value %v", value.Kind(), v)
 	}
+}
+
+// Converts a CamelCase string to a lower case string with spaces
+func lowerCaseWithSpaces(s string) (lower string) {
+	for _, r := range s {
+		if unicode.IsLower(r) {
+			lower += string(r)
+		} else if unicode.IsUpper(r) {
+			lower += " " + string(unicode.ToLower(r))
+		}
+	}
+	return strings.TrimSpace(lower)
+}
+
+func camelCase(s string) (camel string) {
+	previousRuneWasSpace := true
+	for _, r := range s {
+		if previousRuneWasSpace {
+			camel += string(unicode.ToUpper(r))
+			previousRuneWasSpace = false
+		} else if unicode.IsSpace(r) {
+			previousRuneWasSpace = true
+		} else {
+			camel += string(r)
+		}
+	}
+	return camel
 }
 
 // TODO(apm): This would be a lot cleaner if we built a syntax tree.

@@ -24,14 +24,14 @@ func TestMarshal(t *testing.T) {
 	marshalData := map[interface{}]string{
 		10:                    "i10e",
 		"spam":                "4:spam",
-		TestList{"alice", 30}: "l5:alicei30ee",
+		TestList{"alice", 30}: "d4:name5:alice3:agei30ee",
 	}
 	for input, expected := range marshalData {
 		ValidateMarshal(input, expected, t)
 	}
 	ValidateMarshal(
 		map[TestList]int{TestList{"alice", 30}: 35, TestList{"bob", 25}: 30},
-		"dl3:bobi25eei30el5:alicei30eei35ee", t)
+		"dd4:name3:bob3:agei25eei30ed4:name5:alice3:agei30eei35ee", t)
 	ValidateMarshal([]int{10, 20, 30}, "li10ei20ei30ee", t)
 }
 
@@ -134,7 +134,7 @@ func TestUnmarshalArrayOfArrays(t *testing.T) {
 
 func TestUnmarshalStruct(t *testing.T) {
 	actual := TestList{}
-	input := "l5:alicei30ee"
+	input := "d4:name5:alice3:agei30ee"
 	expected := TestList{"alice", 30}
 	err := Unmarshal(input, &actual)
 	ValidateUnmarshal(input, expected, actual, err, t)
@@ -148,7 +148,7 @@ type TestListWithPrivate struct {
 
 func TestUnmarshalStructSkipsPrivate(t *testing.T) {
 	actual := TestListWithPrivate{}
-	input := "l5:alicei30ee"
+	input := "d4:name5:alice3:agei30ee"
 	expected := TestListWithPrivate{Name: "alice", Age: 30}
 	err := Unmarshal(input, &actual)
 	ValidateUnmarshal(input, expected, actual, err, t)
@@ -162,7 +162,7 @@ type TestListWithArray struct {
 
 func TestUnmarshalStructWithSlice(t *testing.T) {
 	actual := TestListWithArray{}
-	input := "l5:alicel3:bob5:carolei30ee"
+	input := "d4:name5:alice4:kidsl3:bob5:carole3:agei30ee"
 	expected := TestListWithArray{"alice", []string{"bob", "carol"}, 30}
 	err := Unmarshal(input, &actual)
 	if err != nil {
