@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/optimality/bencoding"
+	"github.com/optimality/gotorrent/bencoding"
 )
 
 func TestMetaInfo(t *testing.T) {
