@@ -10,6 +10,7 @@ import (
 )
 
 // Marshal takes the given Go datastructure and converts it to a bencoded string.
+// See https://wiki.theory.org/BitTorrentSpecification#Bencoding for details about bencoding.
 func Marshal(source interface{}) (bencoded_string string, err error) {
 	value := reflect.ValueOf(source)
 	switch value.Kind() {

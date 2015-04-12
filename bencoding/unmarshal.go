@@ -11,6 +11,7 @@ import (
 // Unmarshal takes a bencoded string and a target object, and fills out the target object
 // with the values from the bencoded string.  The structure of the target object must match
 // the structure of the string.  Slices will be automatically sized.
+// See https://wiki.theory.org/BitTorrentSpecification#Bencoding for details about bencoding.
 // TODO(apm): Lots of string copies in here, look into optimizations.
 func Unmarshal(s string, v interface{}) error {
 	ptrValue := reflect.ValueOf(v)
