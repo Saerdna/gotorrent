@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestParser(t *testing.T) {
+func TestLexer(t *testing.T) {
 	input := "d4:name5:alice4:kidsl3:bob5:carole3:agei30ee"
 	expectedTokens := []Token{
 		DICT_START,
@@ -34,10 +34,10 @@ func TestParser(t *testing.T) {
 		"30",
 		"",
 	}
-	reader := bufio.NewReader(strings.NewReader(input))
+	tokenReader := TokenReader{bufio.NewReader(strings.NewReader(input))}
 	for i, expectedToken := range expectedTokens {
 		expectedValue := expectedValues[i]
-		actualToken, actualValue := NextToken(reader)
+		actualToken, actualValue := tokenReader.NextToken()
 		if actualToken != expectedToken {
 			t.Errorf("Expected %v, Actual %v", expectedToken, actualToken)
 		}
@@ -47,30 +47,21 @@ func TestParser(t *testing.T) {
 	}
 }
 
-// func TestDecodeInt(t *testing.T) {
-// 	actual := Int{}
-// 	input := "i10e"
-// 	expected := 10
-// 	err := actual.Decode(strings.NewReader(input))
-// 	if err != nil {
-// 		t.Errorf("Error decoding %v %v", input, err)
-// 	}
-// 	if actual.Value != expected {
-// 		t.Errorf("Results don't match when decoding %v.  Expected %v Actual %v",
-// 			input, expected, actual)
-// 	}
-// }
-
-// func TestDecodeString(t *testing.T) {
-// 	actual := String{}
-// 	input := "4:spam"
-// 	expected := "spam"
-// 	err := actual.Decode(strings.NewReader(input))
-// 	if err != nil {
-// 		t.Errorf("Error decoding %v %v", input, err)
-// 	}
-// 	if actual.Value != expected {
-// 		t.Errorf("Results don't match when decoding %v.  Expected %v Actual %v",
-// 			input, expected, actual)
-// 	}
-// }
+func TestParser(t *testing.T) {
+	input := "d4:name5:alice4:kidsl3:bob5:carole3:agei30ee"
+	expected := Dict{map[Node]Node{
+		String{"name"}: String{"alice"},
+		String{"kids"}: List{[]Node{
+			String{"bob"},
+			String{"carol"},
+		}},
+		String{"age"}: Int{30},
+	}}
+	actual, err := ParseString(input)
+	if err != nil {
+		t.Errorf("Error parsing %v: %v", input, err)
+	}
+	if !Equals(actual, expected) {
+		t.Errorf("Expected %v, Actual %v", expected, actual)
+	}
+}

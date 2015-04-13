@@ -2,7 +2,9 @@ package bencoding
 
 import (
 	"bufio"
+	"fmt"
 	"strconv"
+	"strings"
 )
 
 type Token int
@@ -17,8 +19,12 @@ const (
 	ILLEGAL
 )
 
-func NextToken(b *bufio.Reader) (token Token, value string) {
-	r, _, err := b.ReadRune()
+type TokenReader struct {
+	b *bufio.Reader
+}
+
+func (t *TokenReader) NextToken() (token Token, value string) {
+	r, _, err := t.b.ReadRune()
 	if err != nil {
 		return EOF, ""
 	}
@@ -30,14 +36,14 @@ func NextToken(b *bufio.Reader) (token Token, value string) {
 	case r == 'e':
 		return END, ""
 	case r == 'i':
-		i, err := b.ReadString('e')
+		i, err := t.b.ReadString('e')
 		if err != nil {
 			return EOF, ""
 		}
 		return INT, i[0 : len(i)-1]
 	case '0' <= r && r <= '9':
-		b.UnreadRune()
-		length_string, err := b.ReadString(':')
+		t.b.UnreadRune()
+		length_string, err := t.b.ReadString(':')
 		if err != nil {
 			return EOF, ""
 		}
@@ -48,7 +54,7 @@ func NextToken(b *bufio.Reader) (token Token, value string) {
 		}
 
 		buffer := make([]byte, length)
-		n, err := b.Read(buffer)
+		n, err := t.b.Read(buffer)
 		if err != nil || n != length {
 			return EOF, ""
 		}
@@ -58,159 +64,123 @@ func NextToken(b *bufio.Reader) (token Token, value string) {
 	}
 }
 
-// type Node interface {
-// 	Decode(*bufio.Reader) error
-// }
+type Node interface {
+	isNode()
+}
 
-// type Int struct {
-// 	Value int
-// }
+type Int struct {
+	Int int
+}
+type String struct {
+	String string
+}
+type Dict struct {
+	Dict map[Node]Node
+}
+type List struct {
+	List []Node
+}
 
-// type String struct {
-// 	Value string
-// }
+func (Int) isNode()    {}
+func (String) isNode() {}
+func (Dict) isNode()   {}
+func (List) isNode()   {}
 
-// type List struct {
-// 	Value []Node
-// }
+func ParseString(s string) (Node, error) {
+	tokenReader := TokenReader{bufio.NewReader(strings.NewReader(s))}
+	return Parse(&tokenReader)
+}
+func Parse(t *TokenReader) (Node, error) {
+	token, value := t.NextToken()
+	switch token {
+	case EOF:
+		return nil, nil
+	case LIST_START:
+		l := []Node{}
+		for {
+			value, err := Parse(t)
+			if err != nil {
+				return nil, err
+			}
+			if value == nil {
+				break
+			}
+			l = append(l, value)
+		}
+		return List{l}, nil
+	case DICT_START:
+		m := map[Node]Node{}
+		for {
+			key, err := Parse(t)
+			if err != nil {
+				return nil, err
+			}
+			if key == nil {
+				break
+			}
+			value, err := Parse(t)
+			m[key] = value
+		}
+		return Dict{m}, nil
+	case END:
+		return nil, nil
+	case INT:
+		i, err := strconv.Atoi(value)
+		if err != nil {
+			return nil, err
+		}
+		return Int{i}, nil
+	case STRING:
+		return String{value}, nil
+	case ILLEGAL:
+		return nil, fmt.Errorf("Illegal character in stream")
+	default:
+		return nil, fmt.Errorf("Unknown tokent: %v", token)
+	}
+}
 
-// type End struct{}
-
-// func DecodeUnknown(b *bufio.Reader) (Node, error) {
-// 	start, err := b.Peek(1)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	for {
-// 		switch string(start) {
-// 		case "i":
-// 			var value Int
-// 			err = value.Decode(r)
-// 			if err != nil {
-// 				return value, err
-// 			}
-// 			return value, nil
-// 		case "l":
-// 			var value List
-// 			err = value.Decode(r)
-// 			if err != nil {
-// 				return value, err
-// 			}
-// 			return value, nil
-// 		case "d":
-// 			var value Dict
-// 			err = value.Decode(r)
-// 			if err != nil {
-// 				return value, err
-// 			}
-// 			return value, nil
-// 		case "e":
-// 			return End{}, nil
-// 		default:
-// 			var value String
-// 			err = value.Decode(r)
-// 			if err != nil {
-// 				return value, err
-// 			}
-// 			return value, nil
-// 		}
-// 	}
-// }
-
-// func (i *Int) Decode(b *bufio.Reader) error {
-// 	start, err := b.ReadByte()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if start != 'i' {
-// 		return fmt.Errorf("Int didn't start with i.")
-// 	}
-
-// 	s, err := b.ReadString('e')
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	i.Value, err = strconv.Atoi(s[:len(s)-1])
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
-
-// func (s *String) Decode(b *bufio.Reader) error {
-// 	length_string, err := b.ReadString(':')
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	length, err := strconv.Atoi(length_string[:len(length_string)-1])
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	buffer := make([]byte, length)
-// 	n, err := b.Read(buffer)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if n != length {
-// 		return fmt.Errorf("String had length %v, but buffer only had %v bytes: %v",
-// 			length, len(s.Value), s.Value)
-// 	}
-
-// 	s.Value = string(buffer)
-// 	return nil
-// }
-
-// func (l *List) Decode(b *bufio.Reader) error {
-// 	start := make([]byte, 1)
-// 	n, err := b.Read(start)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if n < len(start) || string(start) != "l" {
-// 		return fmt.Errorf("Invalid list.")
-// 	}
-
-// 	start, err = b.Peek(1)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	for {
-// 		switch string(start) {
-// 		case "i":
-// 			var value Int
-// 			err = value.Decode(r)
-// 			if err != nil {
-// 				return err
-// 			}
-// 			l.Value = append(l.Value, value)
-// 		case "l":
-// 			var value List
-// 			err = value.Decode(r)
-// 			if err != nil {
-// 				return err
-// 			}
-// 			l.Value = append(l.Value, value)
-// 		case "d":
-// 			var value Dict
-// 			err = value.Decode(r)
-// 			if err != nil {
-// 				return err
-// 			}
-// 			l.Value = append(l.Value, value)
-// 		default:
-// 			var value String
-// 			err = value.Decode(r)
-// 			if err != nil {
-// 				return err
-// 			}
-// 			l.Value = append(l.Value, value)
-// 		}
-// 	}
-// }
-
-// func (e *End) Decode(b *bufio.Reader) error {
-
-// }
+func Equals(n1, n2 Node) bool {
+	switch t1 := n1.(type) {
+	case Int:
+		t2, ok := n2.(Int)
+		if !ok || t1.Int != t2.Int {
+			return false
+		}
+		return true
+	case String:
+		t2, ok := n2.(String)
+		if !ok || t1.String != t2.String {
+			return false
+		}
+		return true
+	case List:
+		t2, ok := n2.(List)
+		if !ok || len(t1.List) != len(t2.List) {
+			return false
+		}
+		for i, value1 := range t1.List {
+			value2 := t2.List[i]
+			if !Equals(value1, value2) {
+				return false
+			}
+		}
+		return true
+	case Dict:
+		t2, ok := n2.(Dict)
+		if !ok {
+			return false
+		}
+		if len(t1.Dict) != len(t2.Dict) {
+			return false
+		}
+		for key, value1 := range t1.Dict {
+			value2, ok := t2.Dict[key]
+			if !ok || !Equals(value1, value2) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
